@@ -2,61 +2,18 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/gosimple/slug"
-	"github.com/schollz/progressbar/v3"
+	"github.com/tuffnerdstuff/jira-attachment-sync/config"
+	"github.com/tuffnerdstuff/jira-attachment-sync/model"
+	"github.com/tuffnerdstuff/jira-attachment-sync/net"
 )
-
-const ENDPOINT_ISSUE = "issue"
-const ENDPOINT_ATTACHMENT = "attachment"
-
-var username string
-var password string
-var base_url string
-var output_dir string = "."
-var issueKey string
-var http_retries = 0
-
-type Issue struct {
-	ID     int    `json:"id"`
-	Key    string `json:"key"`
-	Fields Fields `json:"fields"`
-}
-
-type Fields struct {
-	Attachments []Attachment `json:"attachment"`
-	Summary     string       `json:"summary"`
-	Description string       `json:"description"`
-}
-
-type Attachment struct {
-	ID          string `json:"id"`
-	URL         string `json:"content"`
-	Filename    string `json:"filename"`
-	MimeType    string `json:"mimeType"`
-	CreatedTime string `json:"created"`
-	Size        int    `json:"size"`
-}
-
-func parseArgs() {
-	flag.StringVar(&username, "username", "myuser", "Your Jira username")
-	flag.StringVar(&password, "password", "mypass", "Your Jira password")
-	flag.StringVar(&base_url, "base_url", "https://example.com/rest/api/2", "Your Jira password")
-	flag.StringVar(&output_dir, "output", ".", "The base path to your downloaded attachments")
-	flag.StringVar(&issueKey, "issue", "WHATEVER-42", "The isse ID")
-	flag.Parse()
-}
 
 func handleError(err error) {
 	if err != nil {
@@ -64,41 +21,18 @@ func handleError(err error) {
 	}
 }
 
-func getUrl(url string) (*http.Response, error) {
-	var resp *http.Response = nil
-	var err error
-	for i := 0; i < http_retries+1; i++ {
-
-		req, err := http.NewRequest("GET", url, nil)
-		handleError(err)
-		req.SetBasicAuth(username, password)
-		resp, err = http.DefaultClient.Do(req)
-		handleError(err)
-		if resp.StatusCode == http.StatusOK {
-			break
-		}
-	}
-	return resp, err
-}
-
-func getIssue() Issue {
-	issueURL := getUrlForPath(ENDPOINT_ISSUE + "/" + issueKey + "?fields=attachment,summary,description")
-	resp, err := getUrl(issueURL)
+func getIssue() model.Issue {
+	issueURL, err := net.GetUrlForPath(config.BaseUrl, model.ENDPOINT_ISSUE+"/"+config.IssueKey+"?fields=attachment,summary,description")
+	handleError(err)
+	resp, err := net.GetUrl(issueURL, config.Username, config.Password, config.HttpRetryCount)
 	handleError(err)
 	defer resp.Body.Close()
 	jsonBytes, err := ioutil.ReadAll(resp.Body)
 	handleError(err)
-	var issue Issue
-	json.Unmarshal([]byte(jsonBytes), &issue)
+	var issue model.Issue
+	err = json.Unmarshal([]byte(jsonBytes), &issue)
+	handleError(err)
 	return issue
-}
-
-func getUrlForPath(path string) string {
-	baseURL, err := url.Parse(base_url)
-	handleError(err)
-	issuePath, err := url.Parse(path)
-	handleError(err)
-	return baseURL.ResolveReference(issuePath).String()
 }
 
 func getPathSafeString(str string) string {
@@ -113,40 +47,6 @@ func getPathSafeString(str string) string {
 
 func createDir(dirPath string) {
 	os.MkdirAll(dirPath, os.ModePerm)
-}
-
-func downloadFile(filepath string, url string, prefix string) error {
-
-	// Get the data
-	resp, err := getUrl(url)
-	handleError(err)
-	defer resp.Body.Close()
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Progress Bar
-	bar := progressbar.DefaultBytes(resp.ContentLength, prefix)
-
-	// Write the body to progressbar and file
-	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
-	return err
-}
-
-func isCompressed(attachment Attachment) bool {
-
-	extensions := []string{".zip", ".rar", ".7z", ".001"}
-	for _, extension := range extensions {
-		if strings.HasSuffix(strings.ToLower(attachment.Filename), extension) {
-			return true
-		}
-
-	}
-	return false
 }
 
 func extractFile(filePath string, outputDir string, prefix string) {
@@ -171,17 +71,7 @@ func pathExists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-func getAttachmentFileName(attachment Attachment) string {
-	prefix := attachment.ID
-	// golang is whack! These are "magic numbers" in the pattern string ...
-	createdTime, err := time.Parse("2006-01-02T15:04:05.000-0700", attachment.CreatedTime)
-	if err == nil {
-		prefix = createdTime.Format("2006-01-02")
-	}
-	return fmt.Sprintf("%s_%s", prefix, attachment.Filename)
-}
-
-func getAttachmentProgressPrefix(index int, attachments []Attachment) string {
+func getAttachmentProgressPrefix(index int, attachments []model.Attachment) string {
 	bullet := '├'
 	if index+1 == len(attachments) {
 		bullet = '└'
@@ -202,11 +92,11 @@ func downloadAttachments() {
 
 	// Retrieve issue
 	issue := getIssue()
-	issueTitle := fmt.Sprintf("%s %s", issue.Key, issue.Fields.Summary)
+	issueTitle := issue.GetTitle()
 	printHeader(issueTitle, '║', '═', '╔', '╗', '╚', '╝')
 
 	// Make sure issue dir exists
-	issueDir := path.Join(output_dir, getPathSafeString(issueTitle))
+	issueDir := path.Join(config.OutputDir, getPathSafeString(issueTitle))
 	createDir(issueDir)
 
 	if issue.Fields.Attachments == nil || len(issue.Fields.Attachments) == 0 {
@@ -216,19 +106,21 @@ func downloadAttachments() {
 
 	// Download attachments
 	printHeader("Downloading", '│', '─', '┌', '┐', '├', '┘')
-	var compressedAttachments []Attachment
+	var compressedAttachments []model.Attachment
 	for i, attachment := range issue.Fields.Attachments {
-		attachmentFileName := getAttachmentFileName(attachment)
+		attachmentFileName := attachment.GetFilenameWithDatePrefix()
 		filePath := path.Join(issueDir, attachmentFileName)
 		prefix := getAttachmentProgressPrefix(i, issue.Fields.Attachments)
 		if !pathExists(filePath) {
-			err := downloadFile(filePath, attachment.URL, prefix)
+			resp, err := net.GetUrl(attachment.URL, config.Username, config.Password, config.HttpRetryCount)
+			handleError(err)
+			err = net.DownloadFile(resp, filePath, prefix)
 			handleError(err)
 		} else {
 			fmt.Printf("%sSKIPPED\n", prefix)
 		}
 
-		if isCompressed(attachment) {
+		if attachment.IsCompressed() {
 			compressedAttachments = append(compressedAttachments, attachment)
 		}
 	}
@@ -239,16 +131,27 @@ func downloadAttachments() {
 	for i, attachment := range compressedAttachments {
 		prefix := getAttachmentProgressPrefix(i, compressedAttachments)
 		createDir(extractedDir)
-		attachmentFileName := getAttachmentFileName(attachment)
+		attachmentFileName := attachment.GetFilenameWithDatePrefix()
 		filePath := path.Join(issueDir, attachmentFileName)
 		extractFile(filePath, path.Join(extractedDir, getPathSafeString(attachmentFileName)), prefix)
 	}
 
 }
 
+func catchPanic() {
+	if err := recover(); err != nil {
+		fmt.Fprintf(os.Stderr, "An error occurred: %v\n", err)
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
 func main() {
 
-	parseArgs()
-	downloadAttachments()
+	defer catchPanic()
+
+	if config.ParseArgs() {
+		downloadAttachments()
+	}
 
 }
