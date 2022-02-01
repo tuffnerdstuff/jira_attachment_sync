@@ -64,8 +64,9 @@ func handleError(err error) {
 	}
 }
 
-func getUrl(url string) *http.Response {
+func getUrl(url string) (*http.Response, error) {
 	var resp *http.Response = nil
+	var err error
 	for i := 0; i < http_retries+1; i++ {
 
 		req, err := http.NewRequest("GET", url, nil)
@@ -77,12 +78,13 @@ func getUrl(url string) *http.Response {
 			break
 		}
 	}
-	return resp
+	return resp, err
 }
 
 func getIssue() Issue {
 	issueURL := getUrlForPath(ENDPOINT_ISSUE + "/" + issueKey + "?fields=attachment,summary,description")
-	resp := getUrl(issueURL)
+	resp, err := getUrl(issueURL)
+	handleError(err)
 	defer resp.Body.Close()
 	jsonBytes, err := ioutil.ReadAll(resp.Body)
 	handleError(err)
@@ -116,7 +118,8 @@ func createDir(dirPath string) {
 func downloadFile(filepath string, url string, prefix string) error {
 
 	// Get the data
-	resp := getUrl(url)
+	resp, err := getUrl(url)
+	handleError(err)
 	defer resp.Body.Close()
 
 	// Create the file
@@ -186,27 +189,35 @@ func getAttachmentProgressPrefix(index int, attachments []Attachment) string {
 	return fmt.Sprintf("%c─ %s: ", bullet, attachments[index].Filename)
 }
 
+func printHeader(title string, vertical rune, horizontal rune, luCorner rune, ruCorner rune, llCorner rune, rlCorner rune) {
+
+	repeatCount := len(title) + 3
+	horizontalLine := strings.Repeat(fmt.Sprintf("%c", horizontal), repeatCount)
+	fmt.Printf("%c%s%c\n", luCorner, horizontalLine, ruCorner)
+	fmt.Printf("%c %s  %c\n", vertical, title, vertical)
+	fmt.Printf("%c%s%c\n", llCorner, horizontalLine, rlCorner)
+}
+
 func downloadAttachments() {
-	// Make sure output dir exists
-	createDir(output_dir)
 
 	// Retrieve issue
 	issue := getIssue()
 	issueTitle := fmt.Sprintf("%s %s", issue.Key, issue.Fields.Summary)
-	fmt.Println(issueTitle)
-	//fmt.Println(issue.Fields.Description)
+	printHeader(issueTitle, '║', '═', '╔', '╗', '╚', '╝')
 
 	// Make sure issue dir exists
 	issueDir := path.Join(output_dir, getPathSafeString(issueTitle))
 	createDir(issueDir)
 
+	if issue.Fields.Attachments == nil || len(issue.Fields.Attachments) == 0 {
+		fmt.Println("Issue has no attachments!")
+		return
+	}
+
 	// Download attachments
-	fmt.Println("┌─────────────┐")
-	fmt.Println("│ Downloading │")
-	fmt.Println("├─────────────┘")
+	printHeader("Downloading", '│', '─', '┌', '┐', '├', '┘')
 	var compressedAttachments []Attachment
 	for i, attachment := range issue.Fields.Attachments {
-		//fmt.Printf("%c┬─ %s (%d bytes)", bullet1, attachment.Filename, attachment.Size)
 		attachmentFileName := getAttachmentFileName(attachment)
 		filePath := path.Join(issueDir, attachmentFileName)
 		prefix := getAttachmentProgressPrefix(i, issue.Fields.Attachments)
@@ -223,10 +234,7 @@ func downloadAttachments() {
 	}
 
 	// Extract compressed attachments
-
-	fmt.Println("┌─────────────┐")
-	fmt.Println("│ Extracting  │")
-	fmt.Println("├─────────────┘")
+	printHeader("Extracting", '│', '─', '┌', '┐', '├', '┘')
 	extractedDir := path.Join(issueDir, "__extracted__")
 	for i, attachment := range compressedAttachments {
 		prefix := getAttachmentProgressPrefix(i, compressedAttachments)
