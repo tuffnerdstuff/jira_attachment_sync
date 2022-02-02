@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,6 +16,9 @@ import (
 	"github.com/tuffnerdstuff/jira-attachment-sync/net"
 )
 
+var conf config.Config
+var args config.Arguments
+
 func handleError(err error) {
 	if err != nil {
 		panic(err)
@@ -22,9 +26,9 @@ func handleError(err error) {
 }
 
 func getIssue() model.Issue {
-	issueURL, err := net.GetUrlForPath(config.BaseUrl, model.ENDPOINT_ISSUE+"/"+config.IssueKey+"?fields=attachment,summary,description")
+	issueURL, err := net.GetUrlForPath(conf.BaseUrl, model.ENDPOINT_ISSUE+"/"+args.IssueKey+"?fields=attachment,summary,description")
 	handleError(err)
-	resp, err := net.GetUrl(issueURL, config.Username, config.Password, config.HttpRetryCount)
+	resp, err := net.GetUrl(issueURL, conf.Username, conf.Password, conf.RetryCount)
 	handleError(err)
 	defer resp.Body.Close()
 	jsonBytes, err := ioutil.ReadAll(resp.Body)
@@ -96,7 +100,7 @@ func downloadAttachments() {
 	printHeader(issueTitle, '║', '═', '╔', '╗', '╚', '╝')
 
 	// Make sure issue dir exists
-	issueDir := path.Join(config.OutputDir, getPathSafeString(issueTitle))
+	issueDir := path.Join(conf.OutputDir, getPathSafeString(issueTitle))
 	createDir(issueDir)
 
 	if issue.Fields.Attachments == nil || len(issue.Fields.Attachments) == 0 {
@@ -112,7 +116,7 @@ func downloadAttachments() {
 		filePath := path.Join(issueDir, attachmentFileName)
 		prefix := getAttachmentProgressPrefix(i, issue.Fields.Attachments)
 		if !pathExists(filePath) {
-			resp, err := net.GetUrl(attachment.URL, config.Username, config.Password, config.HttpRetryCount)
+			resp, err := net.GetUrl(attachment.URL, conf.Username, conf.Password, conf.RetryCount)
 			handleError(err)
 			err = net.DownloadFile(resp, filePath, prefix)
 			handleError(err)
@@ -150,7 +154,19 @@ func main() {
 
 	defer catchPanic()
 
-	if config.ParseArgs() {
+	// Parse Args
+	config.ParseArgs(&args)
+
+	// Parse Config
+	err := config.LoadConfig(&conf, &args)
+	handleError(err)
+
+	// Override Config from file with Config from command-line
+	config.ParseConfig(&conf)
+
+	if args.ShowHelp || !conf.Validate() || !args.Validate() {
+		flag.Usage()
+	} else {
 		downloadAttachments()
 	}
 
