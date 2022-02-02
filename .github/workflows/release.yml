@@ -29,12 +29,12 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -o ./release/jas-linux-${{github.ref_name}}/jas
           GOOS=windows GOARCH=amd64 go build -o ./release/jas-win-${{github.ref_name}}/jas.exe
           GOOS=darwin GOARCH=amd64 go build -o ./release/jas-linux-${{github.ref_name}}/jas
-          tar -zcvf ./releases/jas-linux-${{github.ref_name}}.tar.gz ./release/jas-linux-${{github.ref_name}}
-          tar -zcvf ./releases/jas-win-${{github.ref_name}}.tar.gz ./release/jas-win-${{github.ref_name}}
-          tar -zcvf ./releases/jas-mac-${{github.ref_name}}.tar.gz ./release/jas-mac-${{github.ref_name}}
+          tar -zcvf jas-linux-${{github.ref_name}}.tar.gz ./release/jas-linux-${{github.ref_name}}
+          tar -zcvf jas-win-${{github.ref_name}}.tar.gz ./release/jas-win-${{github.ref_name}}
+          tar -zcvf jas-mac-${{github.ref_name}}.tar.gz ./release/jas-mac-${{github.ref_name}}
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
           files: |
-            ./releases/*.tar.gz
+            *.tar.gz
