@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime/debug"
 	"strings"
 
 	"github.com/gosimple/slug"
@@ -145,6 +146,7 @@ func downloadAttachments() {
 func catchPanic() {
 	if err := recover(); err != nil {
 		fmt.Fprintf(os.Stderr, "An error occurred: %v\n", err)
+		debug.PrintStack()
 		os.Exit(1)
 	}
 	os.Exit(0)
