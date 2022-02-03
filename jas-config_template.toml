@@ -1,0 +1,6 @@
+username = "username"
+password = "password"
+baseUrl = "https://jira.example.de/rest/api/2/"
+outputDir = "./output"
+retryCount = 5
+sevenZip = "7z"
