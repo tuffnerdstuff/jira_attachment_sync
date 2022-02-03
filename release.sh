@@ -19,7 +19,7 @@ build() {
     export GOARCH=$arch
     mkdir -p $out_dir
     go build -o "$out_dir/jas$ext"
-    tar -zcvf jas-$os$version.tar.gz --directory $(realpath $out_dir) .
+    tar -zcvf jas-$os$version.tar.gz --directory $(realpath $out_dir) . ../../README.md
 }
 
 version=$1

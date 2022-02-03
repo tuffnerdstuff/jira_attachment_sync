@@ -58,7 +58,7 @@ func extractFile(filePath string, outputDir string, prefix string) {
 	fmt.Printf("%sEXTRACTING ...", prefix)
 	if !pathExists(outputDir) {
 		createDir(outputDir)
-		cmd := exec.Command("7z", "x", "-aos", "-o"+outputDir, filePath)
+		cmd := exec.Command(conf.SevenZip, "x", "-aos", "-o"+outputDir, filePath)
 		err := cmd.Run()
 		if err != nil {
 			fmt.Printf("\r%sERROR!        \n", prefix)
@@ -157,12 +157,9 @@ func main() {
 	// Parse Args
 	config.ParseArgs(&args)
 
-	// Parse Config
-	err := config.LoadConfig(&conf, &args)
+	// Load Config
+	err := config.LoadConfig(&conf, args.ConfigPath)
 	handleError(err)
-
-	// Override Config from file with Config from command-line
-	config.ParseConfig(&conf)
 
 	if args.ShowHelp || !conf.Validate() || !args.Validate() {
 		flag.Usage()

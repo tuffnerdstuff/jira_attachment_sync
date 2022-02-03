@@ -4,8 +4,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-func LoadConfig(config *Config, args *Arguments) error {
-	viper.SetConfigFile(args.ConfigPath)
+func LoadConfig(config *Config, configPath string) error {
+	viper.SetConfigFile(configPath)
 	viper.SetConfigType("toml")
 
 	viper.AutomaticEnv()
