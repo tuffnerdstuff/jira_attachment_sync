@@ -9,4 +9,4 @@ Once `jas` is configured you can execute it by providing a jira issue key by pas
 
 ## Example
 Download attachments of `BUG-123` and use config at `/path/to/config.toml`:
-`jas --configDir /path/to/config.toml --isue BUG-123`
+`jas --configDir /path/to/config.toml --issue BUG-123`
