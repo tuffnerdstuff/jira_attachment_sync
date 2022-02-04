@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -26,11 +27,18 @@ func handleError(err error) {
 	}
 }
 
+func handleBadResponse(resp *http.Response) {
+	if !net.IsResponseOK(resp) {
+		handleError(fmt.Errorf("could not get valid HTTP response, last response was %v", resp.Status))
+	}
+}
+
 func getIssue() model.Issue {
 	issueURL, err := net.GetUrlForPath(conf.BaseUrl, model.ENDPOINT_ISSUE+"/"+args.IssueKey+"?fields=attachment,summary,description")
 	handleError(err)
 	resp, err := net.GetUrl(issueURL, conf.Username, conf.Password, conf.RetryCount)
 	handleError(err)
+	handleBadResponse(resp)
 	defer resp.Body.Close()
 	jsonBytes, err := ioutil.ReadAll(resp.Body)
 	handleError(err)
@@ -118,6 +126,7 @@ func downloadAttachments() {
 		prefix := getAttachmentProgressPrefix(i, issue.Fields.Attachments)
 		if !pathExists(filePath) {
 			resp, err := net.GetUrl(attachment.URL, conf.Username, conf.Password, conf.RetryCount)
+			handleBadResponse(resp)
 			handleError(err)
 			err = net.DownloadFile(resp, filePath, prefix)
 			handleError(err)

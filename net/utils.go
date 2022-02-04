@@ -5,9 +5,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/schollz/progressbar/v3"
 )
+
+const RETRY_SLEEP = 2 * time.Second
+
+func IsResponseOK(resp *http.Response) bool {
+	return resp.StatusCode == http.StatusOK
+}
 
 func GetUrl(url string, username string, password string, retries int) (*http.Response, error) {
 	var resp *http.Response = nil
@@ -23,9 +30,10 @@ func GetUrl(url string, username string, password string, retries int) (*http.Re
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode == http.StatusOK {
+		if IsResponseOK(resp) {
 			break
 		}
+		time.Sleep(RETRY_SLEEP)
 	}
 	return resp, err
 }
