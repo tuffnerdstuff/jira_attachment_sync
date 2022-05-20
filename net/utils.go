@@ -50,7 +50,7 @@ func GetUrlForPath(base_url string, path string) (string, error) {
 	return baseURL.ResolveReference(issuePath).String(), err
 }
 
-func DownloadFile(resp *http.Response, filepath string, prefix string) error {
+func DownloadFile(resp *http.Response, filepath string, prefix string, showProgress bool) error {
 
 	// Get the data
 	defer resp.Body.Close()
@@ -63,9 +63,13 @@ func DownloadFile(resp *http.Response, filepath string, prefix string) error {
 	defer out.Close()
 
 	// Progress Bar
-	bar := progressbar.DefaultBytes(resp.ContentLength, prefix)
+	var writer io.Writer = out
+	if showProgress {
+		bar := progressbar.DefaultBytes(resp.ContentLength, prefix)
+		writer = io.MultiWriter(out, bar)
+	}
 
 	// Write the body to progressbar and file
-	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
+	_, err = io.Copy(writer, resp.Body)
 	return err
 }

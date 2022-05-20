@@ -12,9 +12,10 @@ type Config struct {
 }
 
 type Arguments struct {
-	ConfigPath string
-	IssueKey   string
-	ShowHelp   bool
+	ConfigPath   string
+	IssueKey     string
+	ShowHelp     bool
+	ShowProgress bool
 }
 
 func validateStringArg(value string, error_msg string, valid_flag *bool) {

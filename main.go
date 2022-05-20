@@ -64,7 +64,9 @@ func createDir(dirPath string) {
 
 func extractFile(filePath string, outputDir string, prefix string) {
 	// TODO: Use Temp Dir and only copy if extraction successful
-	fmt.Printf("%sEXTRACTING ...", prefix)
+	if args.ShowProgress {
+		fmt.Printf("%sEXTRACTING ...", prefix)
+	}
 	if !pathExists(outputDir) {
 		createDir(outputDir)
 		cmd := exec.Command(conf.SevenZip, "x", "-aos", "-o"+outputDir, filePath)
@@ -92,7 +94,17 @@ func getAttachmentProgressPrefix(index int, attachments []model.Attachment) stri
 	return fmt.Sprintf("%c─ %s: ", bullet, attachments[index].Filename)
 }
 
-func printHeader(title string, vertical rune, horizontal rune, luCorner rune, ruCorner rune, llCorner rune, rlCorner rune) {
+func printHeader(title string, level int) {
+	if !args.ShowProgress {
+		fmt.Println(title)
+	} else if level == 1 {
+		printAsciiHeader(title, '║', '═', '╔', '╗', '╚', '╝')
+	} else {
+		printAsciiHeader(title, '│', '─', '┌', '┐', '├', '┘')
+	}
+}
+
+func printAsciiHeader(title string, vertical rune, horizontal rune, luCorner rune, ruCorner rune, llCorner rune, rlCorner rune) {
 
 	repeatCount := len(title) + 3
 	horizontalLine := strings.Repeat(fmt.Sprintf("%c", horizontal), repeatCount)
@@ -106,7 +118,7 @@ func downloadAttachments() {
 	// Retrieve issue
 	issue := getIssue()
 	issueTitle := issue.GetTitle()
-	printHeader(issueTitle, '║', '═', '╔', '╗', '╚', '╝')
+	printHeader(issueTitle, 1)
 
 	// Make sure issue dir exists
 	issueDir := path.Join(conf.OutputDir, getPathSafeString(issueTitle))
@@ -118,7 +130,7 @@ func downloadAttachments() {
 	}
 
 	// Download attachments
-	printHeader("Downloading", '│', '─', '┌', '┐', '├', '┘')
+	printHeader("Downloading", 2)
 	var compressedAttachments []model.Attachment
 	for i, attachment := range issue.Fields.Attachments {
 		attachmentFileName := attachment.GetFilenameWithDatePrefix()
@@ -128,7 +140,7 @@ func downloadAttachments() {
 			resp, err := net.GetUrl(attachment.URL, conf.Username, conf.Password, conf.RetryCount)
 			handleBadResponse(resp)
 			handleError(err)
-			err = net.DownloadFile(resp, filePath, prefix)
+			err = net.DownloadFile(resp, filePath, prefix, args.ShowProgress)
 			handleError(err)
 		} else {
 			fmt.Printf("%sSKIPPED\n", prefix)
@@ -140,7 +152,7 @@ func downloadAttachments() {
 	}
 
 	// Extract compressed attachments
-	printHeader("Extracting", '│', '─', '┌', '┐', '├', '┘')
+	printHeader("Extracting", 2)
 	extractedDir := path.Join(issueDir, "__extracted__")
 	for i, attachment := range compressedAttachments {
 		prefix := getAttachmentProgressPrefix(i, compressedAttachments)
