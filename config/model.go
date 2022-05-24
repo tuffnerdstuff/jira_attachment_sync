@@ -7,13 +7,13 @@ type Config struct {
 	Username   string
 	Password   string
 	OutputDir  string
-	SevenZip   string
 	RetryCount int
 }
 
 type Arguments struct {
 	ConfigPath   string
 	IssueKey     string
+	Script       string
 	ShowHelp     bool
 	ShowProgress bool
 }

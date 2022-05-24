@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -25,16 +24,4 @@ func (a *Attachment) GetFilenameWithDatePrefix() string {
 		prefix = createdTime.Format("2006-01-02")
 	}
 	return fmt.Sprintf("%s_%s", prefix, a.Filename)
-}
-
-func (a *Attachment) IsCompressed() bool {
-
-	extensions := []string{".zip", ".rar", ".7z", ".001"}
-	for _, extension := range extensions {
-		if strings.HasSuffix(strings.ToLower(a.Filename), extension) {
-			return true
-		}
-
-	}
-	return false
 }

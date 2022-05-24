@@ -62,22 +62,15 @@ func createDir(dirPath string) {
 	os.MkdirAll(dirPath, os.ModePerm)
 }
 
-func extractFile(filePath string, outputDir string, prefix string) {
-	// TODO: Use Temp Dir and only copy if extraction successful
-	if args.ShowProgress {
-		fmt.Printf("%sEXTRACTING ...", prefix)
-	}
-	if !pathExists(outputDir) {
-		createDir(outputDir)
-		cmd := exec.Command(conf.SevenZip, "x", "-aos", "-o"+outputDir, filePath)
+func runPostprocessingScript(scriptPath string, issue string, issueDir string) {
+	if pathExists(scriptPath) {
+		cmd := exec.Command(scriptPath, issue, issueDir)
 		err := cmd.Run()
 		if err != nil {
-			fmt.Printf("\r%sERROR!        \n", prefix)
-		} else {
-			fmt.Printf("\r%sOK            \n", prefix)
+			fmt.Println("ERROR!")
 		}
 	} else {
-		fmt.Printf("\r%sSKIPPED       \n", prefix)
+		fmt.Printf("%s does not exist!\n", scriptPath)
 	}
 }
 
@@ -131,7 +124,6 @@ func downloadAttachments() {
 
 	// Download attachments
 	printHeader("Downloading", 2)
-	var compressedAttachments []model.Attachment
 	for i, attachment := range issue.Fields.Attachments {
 		attachmentFileName := attachment.GetFilenameWithDatePrefix()
 		filePath := path.Join(issueDir, attachmentFileName)
@@ -146,20 +138,12 @@ func downloadAttachments() {
 			fmt.Printf("%sSKIPPED\n", prefix)
 		}
 
-		if attachment.IsCompressed() {
-			compressedAttachments = append(compressedAttachments, attachment)
-		}
 	}
 
-	// Extract compressed attachments
-	printHeader("Extracting", 2)
-	extractedDir := path.Join(issueDir, "__extracted__")
-	for i, attachment := range compressedAttachments {
-		prefix := getAttachmentProgressPrefix(i, compressedAttachments)
-		createDir(extractedDir)
-		attachmentFileName := attachment.GetFilenameWithDatePrefix()
-		filePath := path.Join(issueDir, attachmentFileName)
-		extractFile(filePath, path.Join(extractedDir, getPathSafeString(attachmentFileName)), prefix)
+	// Call post-processing script
+	if args.Script != "" {
+		printHeader("Post-Processing", 2)
+		runPostprocessingScript(args.Script, issue.Key, issueDir)
 	}
 
 }
