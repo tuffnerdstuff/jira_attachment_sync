@@ -13,12 +13,12 @@ import (
 const RETRY_SLEEP = 2 * time.Second
 
 func IsResponseOK(resp *http.Response) bool {
-	return resp.StatusCode == http.StatusOK
+	return resp != nil && resp.StatusCode == http.StatusOK
 }
 
 func GetUrl(url string, username string, password string, retries int) (*http.Response, error) {
 	var resp *http.Response = nil
-	var err error
+	var err error = nil
 	for i := 0; i < retries+1; i++ {
 
 		req, err := http.NewRequest("GET", url, nil)
@@ -27,10 +27,7 @@ func GetUrl(url string, username string, password string, retries int) (*http.Re
 		}
 		req.SetBasicAuth(username, password)
 		resp, err = http.DefaultClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if IsResponseOK(resp) {
+		if err == nil && IsResponseOK(resp) {
 			break
 		}
 		time.Sleep(RETRY_SLEEP)

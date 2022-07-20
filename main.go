@@ -29,7 +29,7 @@ func handleError(err error) {
 
 func handleBadResponse(resp *http.Response) {
 	if !net.IsResponseOK(resp) {
-		handleError(fmt.Errorf("could not get valid HTTP response, last response was %v", resp.Status))
+		handleError(fmt.Errorf("could not get valid HTTP response, last response was %v", resp))
 	}
 }
 
@@ -130,8 +130,8 @@ func downloadAttachments() {
 		prefix := getAttachmentProgressPrefix(i, issue.Fields.Attachments)
 		if !pathExists(filePath) {
 			resp, err := net.GetUrl(attachment.URL, conf.Username, conf.Password, conf.RetryCount)
-			handleBadResponse(resp)
 			handleError(err)
+			handleBadResponse(resp)
 			err = net.DownloadFile(resp, filePath, prefix, args.ShowProgress)
 			handleError(err)
 		} else {
