@@ -65,6 +65,8 @@ func createDir(dirPath string) {
 func runPostprocessingScript(scriptPath string, issue string, issueDir string) {
 	if pathExists(scriptPath) {
 		cmd := exec.Command(scriptPath, issue, issueDir)
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
 		err := cmd.Run()
 		if err != nil {
 			fmt.Println("ERROR!")
