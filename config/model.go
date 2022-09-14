@@ -12,7 +12,7 @@ type Config struct {
 
 type Arguments struct {
 	ConfigPath   string
-	IssueKey     string
+	URI          string
 	Script       string
 	ShowHelp     bool
 	ShowProgress bool
@@ -35,6 +35,6 @@ func (c *Config) Validate() bool {
 
 func (a *Arguments) Validate() bool {
 	valid := true
-	validateStringArg(a.IssueKey, "- Please provide issue_key", &valid)
+	validateStringArg(a.URI, "- Please provide URI", &valid)
 	return valid
 }

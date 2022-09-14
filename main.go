@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -17,6 +18,8 @@ import (
 	"github.com/tuffnerdstuff/jira-attachment-sync/model"
 	"github.com/tuffnerdstuff/jira-attachment-sync/net"
 )
+
+const API_VERSION = 2
 
 var conf config.Config
 var args config.Arguments
@@ -33,6 +36,41 @@ func handleBadResponse(resp *http.Response) {
 	}
 }
 
+func getSearchUriFromUri(uriString string, restApiVersion int) (string, error) {
+	u, err := url.Parse(uriString)
+	if err != nil {
+		return "", err
+	}
+
+	pathSlice := strings.Split(u.Path, "/")
+	query := u.Query()
+
+	baseUrl := fmt.Sprintf("%s://%s/rest/api/%d/search?fields=attachment,summary,description&jql=", u.Scheme, u.Host, restApiVersion)
+
+	if query.Has("jql") {
+		//TODO: move "jql" to const
+		return fmt.Sprintf("%s%s", baseUrl, url.QueryEscape(query.Get("jql"))), nil
+	} else if query.Has("filter") {
+		// TODO: move "filter" to const
+		return fmt.Sprintf("%s%s", baseUrl, url.QueryEscape("filter="+query.Get("filter"))), nil
+	}
+	return fmt.Sprintf("%s%s", baseUrl, url.QueryEscape("key = "+pathSlice[len(pathSlice)-1])), nil
+}
+
+func getSearchResult(searchUrl string) model.Search {
+	resp, err := net.GetUrl(searchUrl, conf.Username, conf.Password, conf.RetryCount)
+	handleError(err)
+	handleBadResponse(resp)
+	defer resp.Body.Close()
+	jsonBytes, err := ioutil.ReadAll(resp.Body)
+	handleError(err)
+	var search model.Search
+	err = json.Unmarshal([]byte(jsonBytes), &search)
+	handleError(err)
+	return search
+}
+
+/*
 func getIssue() model.Issue {
 	issueURL, err := net.GetUrlForPath(conf.BaseUrl, model.ENDPOINT_ISSUE+"/"+args.IssueKey+"?fields=attachment,summary,description")
 	handleError(err)
@@ -47,6 +85,7 @@ func getIssue() model.Issue {
 	handleError(err)
 	return issue
 }
+*/
 
 func getPathSafeString(str string) string {
 	slug.CustomSub = map[string]string{
@@ -108,10 +147,18 @@ func printAsciiHeader(title string, vertical rune, horizontal rune, luCorner run
 	fmt.Printf("%c%s%c\n", llCorner, horizontalLine, rlCorner)
 }
 
-func downloadAttachments() {
+func downloadIssues() {
+	searchUrl, err := getSearchUriFromUri(args.URI, API_VERSION)
+	handleError(err)
+	searchResult := getSearchResult(searchUrl)
+	for _, issue := range searchResult.Issues {
+		downloadIssue(issue)
+	}
+}
+
+func downloadIssue(issue model.Issue) {
 
 	// Retrieve issue
-	issue := getIssue()
 	issueTitle := issue.GetTitle()
 	printHeader(issueTitle, 1)
 
@@ -134,7 +181,13 @@ func downloadAttachments() {
 			resp, err := net.GetUrl(attachment.URL, conf.Username, conf.Password, conf.RetryCount)
 			handleError(err)
 			handleBadResponse(resp)
+			if !args.ShowProgress {
+				fmt.Print(prefix)
+			}
 			err = net.DownloadFile(resp, filePath, prefix, args.ShowProgress)
+			if !args.ShowProgress {
+				fmt.Println("DONE")
+			}
 			handleError(err)
 		} else {
 			fmt.Printf("%sSKIPPED\n", prefix)
@@ -173,7 +226,7 @@ func main() {
 	if args.ShowHelp || !conf.Validate() || !args.Validate() {
 		flag.Usage()
 	} else {
-		downloadAttachments()
+		downloadIssues()
 	}
 
 }

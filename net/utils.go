@@ -1,6 +1,7 @@
 package net
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -19,7 +20,10 @@ func IsResponseOK(resp *http.Response) bool {
 func GetUrl(url string, username string, password string, retries int) (*http.Response, error) {
 	var resp *http.Response = nil
 	var err error = nil
-	for i := 0; i < retries+1; i++ {
+	padLen := len(fmt.Sprintf("%d", retries))
+	decPlaceholder := fmt.Sprintf("%%0%dd", padLen)
+	countFormatString := fmt.Sprintf("[%s/%s]", decPlaceholder, decPlaceholder)
+	for i := 1; i <= retries; i++ {
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -30,6 +34,7 @@ func GetUrl(url string, username string, password string, retries int) (*http.Re
 		if err == nil && IsResponseOK(resp) {
 			break
 		}
+		fmt.Printf(countFormatString+" Retrying %s\n", i, retries, url)
 		time.Sleep(RETRY_SLEEP)
 	}
 	return resp, err
