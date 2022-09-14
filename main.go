@@ -70,23 +70,6 @@ func getSearchResult(searchUrl string) model.Search {
 	return search
 }
 
-/*
-func getIssue() model.Issue {
-	issueURL, err := net.GetUrlForPath(conf.BaseUrl, model.ENDPOINT_ISSUE+"/"+args.IssueKey+"?fields=attachment,summary,description")
-	handleError(err)
-	resp, err := net.GetUrl(issueURL, conf.Username, conf.Password, conf.RetryCount)
-	handleError(err)
-	handleBadResponse(resp)
-	defer resp.Body.Close()
-	jsonBytes, err := ioutil.ReadAll(resp.Body)
-	handleError(err)
-	var issue model.Issue
-	err = json.Unmarshal([]byte(jsonBytes), &issue)
-	handleError(err)
-	return issue
-}
-*/
-
 func getPathSafeString(str string) string {
 	slug.CustomSub = map[string]string{
 		" ": "_",
@@ -128,14 +111,22 @@ func getAttachmentProgressPrefix(index int, attachments []model.Attachment) stri
 	return fmt.Sprintf("%c─ %s: ", bullet, attachments[index].Filename)
 }
 
+func getPadding(level int) string {
+	return strings.Repeat("  ", level)
+}
+
 func printHeader(title string, level int) {
 	if !args.ShowProgress {
-		fmt.Println(title)
+		printLine(title+"\n", level)
 	} else if level == 1 {
 		printAsciiHeader(title, '║', '═', '╔', '╗', '╚', '╝')
 	} else {
 		printAsciiHeader(title, '│', '─', '┌', '┐', '├', '┘')
 	}
+}
+
+func printLine(msg string, level int) {
+	fmt.Printf("%s%s", getPadding(level), msg)
 }
 
 func printAsciiHeader(title string, vertical rune, horizontal rune, luCorner rune, ruCorner rune, llCorner rune, rlCorner rune) {
@@ -151,6 +142,7 @@ func downloadIssues() {
 	searchUrl, err := getSearchUriFromUri(args.URI, API_VERSION)
 	handleError(err)
 	searchResult := getSearchResult(searchUrl)
+	// TODO: Search results could span multiple pages
 	for _, issue := range searchResult.Issues {
 		downloadIssue(issue)
 	}
@@ -182,7 +174,7 @@ func downloadIssue(issue model.Issue) {
 			handleError(err)
 			handleBadResponse(resp)
 			if !args.ShowProgress {
-				fmt.Print(prefix)
+				printLine(prefix, 2)
 			}
 			err = net.DownloadFile(resp, filePath, prefix, args.ShowProgress)
 			if !args.ShowProgress {
@@ -190,7 +182,7 @@ func downloadIssue(issue model.Issue) {
 			}
 			handleError(err)
 		} else {
-			fmt.Printf("%sSKIPPED\n", prefix)
+			printLine(fmt.Sprintf("%sSKIPPED\n", prefix), 2)
 		}
 
 	}
